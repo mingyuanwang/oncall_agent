@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+openai
+faiss-cpu
+sqlite3
+python-dotenv
+requests
+numpy
+pandas 
