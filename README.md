@@ -50,3 +50,8 @@ memory_agent_project/
 ## 简介
 
 Memory Agent Project 是一个智能体记忆管理、推理与规划的 Python 项目，基于 FastAPI/Flask 构建，支持本地向量数据库和自学习能力。 
+# 安装依赖
+pip install -r requirements.txt
+
+# 运行服务
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
