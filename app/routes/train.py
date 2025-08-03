@@ -1,6 +1,5 @@
 # 自学习更新入口
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from flask import Blueprint, request, jsonify, abort
 from typing import Dict, Any, List
 import asyncio
 
@@ -10,22 +9,13 @@ from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
-router = APIRouter(prefix="/train", tags=["train"])
+bp = Blueprint('train', __name__, url_prefix='/api/v1/train')
 
-class TrainingRequest(BaseModel):
-    data: str
-    feedback: str = ""
-    user_id: str = "default"
-    training_type: str = "general"  # general, feedback, batch
-
-class TrainingResponse(BaseModel):
-    status: str
-    message: str
-    updated_memories: int
-    learning_metrics: Dict[str, Any]
-
-@router.post("/", response_model=TrainingResponse)
-async def train_endpoint(request: TrainingRequest):
+@bp.route("/", methods=['POST'])
+def train_endpoint():
+    data = request.get_json()
+    if not data or 'data' not in data:
+        return jsonify({'error': 'Missing required field: data'}), 400
     """
     自学习更新入口
     支持多种学习模式：反馈学习、批量学习等
@@ -37,51 +27,60 @@ async def train_endpoint(request: TrainingRequest):
         # 2. 学习模块
         learner = Learner()
         
-        if request.training_type == "feedback":
+        training_type = data.get('training_type', 'general')
+        if training_type == "feedback":
             # 反馈学习模式
-            result = await learner.learn_from_feedback(
-                data=request.data,
-                feedback=request.feedback,
-                user_id=request.user_id
-            )
-        elif request.training_type == "batch":
+            result = asyncio.run(learner.learn_from_feedback(
+                data=data['data'],
+                feedback=data.get('feedback', ''),
+                user_id=data.get('user_id', 'default')
+            ))
+        elif training_type == "batch":
             # 批量学习模式
-            result = await learner.batch_learn(
-                data=request.data,
-                user_id=request.user_id
-            )
+            result = asyncio.run(learner.batch_learn(
+                data=data['data'],
+                user_id=data.get('user_id', 'default')
+            ))
         else:
             # 通用学习模式
-            result = await learner.general_learn(
+            result = asyncio.run(learner.general_learn(
                 data=request.data,
                 user_id=request.user_id
-            )
+            ))
         
-        return TrainingResponse(
-            status="success",
-            message="Training completed successfully",
-            updated_memories=result.get("updated_memories", 0),
-            learning_metrics=result.get("metrics", {})
-        )
+        asyncio.run(memory_updater.update_memory(
+            data=result,
+            user_id=data.get('user_id', 'default')
+        ))
+
+        return jsonify({
+            "status": "success",
+            "message": "Training completed successfully",
+            "updated_memories": result.get("updated_memories", 0),
+            "learning_metrics": result.get("metrics", {})
+        })
         
     except Exception as e:
         logger.error(f"Training failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
 
-@router.post("/feedback")
-async def feedback_endpoint(request: TrainingRequest):
+@bp.route("/feedback", methods=['POST'])
+def feedback_endpoint():
     """
     用户反馈处理
     用于改进模型和记忆质量
     """
     try:
+        data = request.get_json()
+        if not data or 'memory_id' not in data or 'feedback' not in data:
+            return jsonify({'error': 'Missing required fields: memory_id or feedback'}), 400
         memory_updater = MemoryUpdater()
         
         # 处理用户反馈
-        success = await memory_updater.update_memory_with_feedback(
-            memory_id=request.data,  # 这里假设 data 字段包含 memory_id
-            feedback={"feedback": request.feedback, "user_id": request.user_id}
-        )
+        success = asyncio.run(memory_updater.update_memory_with_feedback(
+            memory_id=data['memory_id'],
+            feedback={"feedback": data['feedback'], "user_id": data.get('user_id', 'default')}
+        ))
         
         if success:
             return {"status": "success", "message": "Feedback processed successfully"}
@@ -92,8 +91,8 @@ async def feedback_endpoint(request: TrainingRequest):
         logger.error(f"Feedback processing failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Feedback processing failed: {str(e)}")
 
-@router.get("/status")
-async def training_status():
+@bp.route("/status", methods=['GET'])
+def training_status():
     """
     获取训练状态
     """
@@ -102,4 +101,4 @@ async def training_status():
         "last_training": "2024-01-01T00:00:00",
         "total_memories": 0,
         "learning_enabled": True
-    } 
+    }

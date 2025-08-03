@@ -1,6 +1,5 @@
 # 查询入口（用户提问）
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from flask import Blueprint, request, jsonify
 from typing import Dict, Any, List
 import asyncio
 
@@ -9,63 +8,61 @@ from core.planning.planner import Planner
 from core.react_executor.react_agent import ReactAgent
 from core.memory.memory_updater import MemoryUpdater
 
-router = APIRouter(prefix="/query", tags=["query"])
+bp = Blueprint('oncall_query_api', __name__, url_prefix='/api/v1/query')
 
-class QueryRequest(BaseModel):
-    question: str
-    context: str = ""
-    user_id: str = "default"
-
-class QueryResponse(BaseModel):
-    answer: str
-    plan_steps: List[str]
-    intermediate_results: List[Dict[str, Any]]
-    memory_traces: List[Dict[str, Any]]
-
-@router.post("/", response_model=QueryResponse)
-async def query_endpoint(request: QueryRequest):
+@bp.route("/", methods=['POST'], strict_slashes=False)
+def query_endpoint():
     """
     用户查询处理主入口
     完整流程：记忆检索 -> 规划 -> 执行 -> 记忆更新
     """
     try:
+        data = request.get_json()
+        logger.info(f"Received query request: {data.get('question')}")
+        if not data or 'question' not in data:
+            return jsonify({'error': 'Missing required field: question'}), 400
+
         # 1. 记忆检索
         memory_store = MemoryStore()
-        context_chunks = await memory_store.retrieve_memory(
-            query=request.question,
-            user_id=request.user_id
-        )
+        context_chunks = asyncio.run(memory_store.retrieve_memory(
+            query=data['question'],
+            user_id=data.get('user_id', 'default')
+        ))
+        logger.info(f"Retrieved {len(context_chunks)} context chunks for query")
         
         # 2. 规划模块
         planner = Planner()
-        plan_steps = await planner.generate_plan(
-            query=request.question,
+        plan_steps = asyncio.run(planner.generate_plan(
+            query=data['question'],
             context_chunks=context_chunks
-        )
-        
+        ))
+
         # 3. Agent 执行
         react_agent = ReactAgent()
-        execution_result = await react_agent.execute_plan(
-            query=request.question,
+        execution_result = asyncio.run(react_agent.execute_plan(
+            query=data['question'],
             plan_steps=plan_steps,
             context_chunks=context_chunks
-        )
+        ))
+        logger.info(f"Query execution completed successfully")
         
         # 4. 记忆更新
         memory_updater = MemoryUpdater()
-        memory_traces = await memory_updater.update_memory(
-            query=request.question,
+        memory_traces = asyncio.run(memory_updater.update_memory(
+            query=data['question'],
             plan_steps=plan_steps,
-            execution_result=execution_result,
-            user_id=request.user_id
-        )
+            answer=execution_result['answer'],
+            intermediate_results=execution_result['intermediate_steps'],
+            user_id=data.get('user_id', 'default')
+        ))
         
-        return QueryResponse(
-            answer=execution_result["final_answer"],
-            plan_steps=plan_steps,
-            intermediate_results=execution_result["intermediate_results"],
-            memory_traces=memory_traces
-        )
+        return jsonify({
+            'answer': execution_result["final_answer"],
+            'plan_steps': plan_steps,
+            'intermediate_results': execution_result["intermediate_results"],
+            'memory_traces': memory_traces
+        })
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Query processing failed: {str(e)}") 
+        logger.error(f"Query processing failed: {str(e)}")
+        return jsonify({'error': str(e)}), 500

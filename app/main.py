@@ -1,13 +1,25 @@
-# FastAPI/Flask 入口
-from fastapi import FastAPI
-from app.routes import query, train
+# Flask应用入口
+import sys
+from pathlib import Path
+# 添加app目录到Python路径
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from flask import Flask, send_from_directory
+from flask_cors import CORS
+from app.routes.query import bp as query_bp
+from app.routes.train import bp as train_bp
 
-app = FastAPI(title="Memory Agent Project")
+app = Flask(__name__, static_folder='static')
 
-# 注册路由
-app.include_router(query.router, prefix="/api/v1")
-app.include_router(train.router, prefix="/api/v1")
+CORS(app)
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+# 提供聊天界面
+@app.route('/')
+def serve_chat():
+    return send_from_directory('static', 'index.html')
+
+# 注册API路由
+app.register_blueprint(query_bp, url_prefix='/api/v1')
+app.register_blueprint(train_bp, url_prefix='/api/v1')
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8000, debug=True)
