@@ -6,7 +6,6 @@ import numpy as np
 import json
 import os
 from typing import List, Dict, Any
-import logging
 
 # 延迟导入配置，避免循环导入
 try:
@@ -19,7 +18,8 @@ except ImportError as e:
         DIMENSION = int(os.getenv("EMBEDDING_DIMENSION", "768"))
         SEARCH_TOP_K = int(os.getenv("FAISS_SEARCH_TOP_K", "5"))
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+logger = get_logger(__name__)
 
 class FAISSVectorStore:
     def __init__(self, index_path: str = None, dimension: int = None):
@@ -37,6 +37,12 @@ class FAISSVectorStore:
     def _load_or_create_index(self):
         """加载或创建索引"""
         try:
+            # 确保索引目录存在
+            index_dir = os.path.dirname(self.index_path)
+            if index_dir and not os.path.exists(index_dir):
+                os.makedirs(index_dir, exist_ok=True)
+                logger.info(f"Created directory for FAISS index: {index_dir}")
+            
             if os.path.exists(self.index_path) and os.path.exists(self.index_path + ".ids"):
                 # 加载现有索引
                 self.index = faiss.read_index(self.index_path)
@@ -50,6 +56,8 @@ class FAISSVectorStore:
                 logger.info("Created new FAISS index")
         except Exception as e:
             logger.error(f"Failed to load or create FAISS index: {e}")
+            import traceback
+            logger.error(f"FAISS index loading/creation traceback: {traceback.format_exc()}")
             # 创建新索引
             self.index = faiss.IndexFlatL2(self.dimension)
             self.id_map = {}
@@ -73,6 +81,8 @@ class FAISSVectorStore:
             logger.info(f"Added {len(ids)} vectors to FAISS index")
         except Exception as e:
             logger.error(f"Failed to add vectors to FAISS index: {e}")
+            import traceback
+            logger.error(f"FAISS vector addition traceback: {traceback.format_exc()}")
     
     def search(self, query_vector: List[float], k: int = 5) -> List[Dict[str, Any]]:
         """搜索相似向量"""
@@ -115,3 +125,5 @@ class FAISSVectorStore:
             logger.info(f"Saved FAISS index to {self.index_path}")
         except Exception as e:
             logger.error(f"Failed to save FAISS index: {e}")
+            import traceback
+            logger.error(f"FAISS index saving traceback: {traceback.format_exc()}")

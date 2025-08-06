@@ -5,9 +5,9 @@ import asyncio
 
 from core.memory.memory_updater import MemoryUpdater
 from core.learning.learner import Learner
-from utils.logger import setup_logger
+from utils.logging_config import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 bp = Blueprint('train', __name__, url_prefix='/api/v1/train')
 

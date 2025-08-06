@@ -6,9 +6,9 @@ from datetime import datetime
 
 from models.llm_inference import LLMInference
 from models.tool_wrappers import ToolWrapper
-from utils.logger import setup_logger
+from utils.logging_config import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 class ReactAgent:
     """
@@ -164,16 +164,19 @@ class ReactAgent:
     
     async def _execute_action(self, step: str, thought: str) -> Dict[str, Any]:
         """执行具体行动"""
+        logger.info(f"开始执行行动，步骤: {step}")
         try:
             # 分析步骤中是否需要调用工具
             tool_call = await self._analyze_tool_requirement(step, thought)
             
             if tool_call:
+                logger.info(f"分析结果需要调用工具: {tool_call['tool_name']}")
                 # 调用工具
                 result = await self.tool_wrapper.call_tool(
                     tool_name=tool_call["tool_name"],
                     parameters=tool_call["parameters"]
                 )
+                logger.info(f"工具调用完成: {tool_call['tool_name']}, 结果: {result}")
                 return {
                     "success": True,
                     "result": result.get("result", ""),
@@ -181,8 +184,10 @@ class ReactAgent:
                     "action_type": "tool_call"
                 }
             else:
+                logger.info("分析结果为纯文本处理")
                 # 纯文本处理
                 result = await self._process_text_step(step, thought)
+                logger.info(f"文本处理完成，结果: {result}")
                 return {
                     "success": True,
                     "result": result,
@@ -190,6 +195,7 @@ class ReactAgent:
                 }
                 
         except Exception as e:
+            logger.error(f"行动执行失败，步骤: {step}, 错误: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),

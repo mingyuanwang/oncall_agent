@@ -5,7 +5,7 @@ import json
 import requests
 import subprocess
 import os
-from utils.logger import setup_logger
+from utils.logging_config import get_logger
 
 # 尝试导入MCP包装器
 try:
@@ -15,7 +15,7 @@ except ImportError:
     MCP_AVAILABLE = False
     print("MCP wrapper not available.")
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 class ToolWrapper:
     def __init__(self):
@@ -28,6 +28,7 @@ class ToolWrapper:
     
     async def call_tool(self, tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """调用工具"""
+        logger.info(f"开始调用工具: {tool_name}, 参数: {parameters}")
         try:
             if tool_name in self.registered_tools:
                 tool_func = self.registered_tools[tool_name]
@@ -38,19 +39,23 @@ class ToolWrapper:
                 else:
                     result = tool_func(**parameters)
                 
+                logger.info(f"工具调用成功: {tool_name}, 结果: {result}")
                 return {
                     "success": True,
                     "result": result,
                     "tool_name": tool_name
                 }
             else:
+                error_msg = f"工具未找到: {tool_name}"
+                logger.error(error_msg)
                 return {
                     "success": False,
-                    "error": f"Tool '{tool_name}' not found",
+                    "error": error_msg,
                     "tool_name": tool_name
                 }
                 
         except Exception as e:
+            logger.error(f"工具调用失败: {tool_name}, 错误: {str(e)}")
             return {
                 "success": False,
                 "error": str(e),

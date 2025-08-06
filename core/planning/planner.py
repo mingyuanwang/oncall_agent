@@ -4,9 +4,9 @@ import json
 import asyncio
 
 from models.llm_inference import LLMInference
-from utils.logger import setup_logger
+from utils.logging_config import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 class Planner:
     """

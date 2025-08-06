@@ -3,6 +3,11 @@ import sys
 from pathlib import Path
 # 添加app目录到Python路径
 sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+# 设置日志配置
+from utils.logging_config import setup_logging
+setup_logging()
+
 from flask import Flask, send_from_directory
 from flask_cors import CORS
 from app.routes.query import bp as query_bp

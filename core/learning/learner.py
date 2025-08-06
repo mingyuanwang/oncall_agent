@@ -5,9 +5,9 @@ import json
 from datetime import datetime
 
 from models.llm_inference import LLMInference
-from utils.logger import setup_logger
+from utils.logging_config import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 class Learner:
     """
@@ -330,4 +330,4 @@ class Learner:
             
         except Exception as e:
             logger.error(f"Feedback-based model update failed: {str(e)}")
-            return {"success": False, "error": str(e)} 
+            return {"success": False, "error": str(e)}

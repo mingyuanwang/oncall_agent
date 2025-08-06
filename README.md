@@ -41,16 +41,22 @@ memory_agent_project/
 │   ├── llm_inference.py
 │   └── tool_wrappers.py            # 第三方工具封装
 ├── utils/
-│   ├── logger.py
+│   ├── logging_config.py           # 日志配置模块
 │   ├── schema.py                   # 通用数据结构定义（pydantic）
 │   └── helpers.py
+├── docs/                           # 文档
+│   └── logging_guide.md            # 日志配置使用指南
 └── tests/                          # 单元测试与集成测试
     └── ...
 ```
 
 ## 简介
 
-Memory Agent Project 是一个智能体记忆管理、推理与规划的 Python 项目，基于 FastAPI/Flask 构建，支持本地向量数据库和自学习能力。 
+Memory Agent Project 是一个智能体记忆管理、推理与规划的 Python 项目，基于 FastAPI/Flask 构建，支持本地向量数据库和自学习能力。
+
+## 日志配置
+
+项目现在使用新的日志配置模块 (`utils/logging_config.py`)，支持多种日志级别和格式化输出。日志文件存储在 `data/logs/` 目录下。
 # 安装依赖
 pip install -r requirements.txt
 

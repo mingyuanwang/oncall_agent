@@ -7,10 +7,10 @@ import uuid
 
 from models.embedding_model import EmbeddingModel
 from models.llm_inference import LLMInference
-from utils.logger import setup_logger
+from utils.logging_config import get_logger
 from utils.helpers import save_json_file
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
 class MemoryUpdater:
     """
@@ -66,6 +66,8 @@ class MemoryUpdater:
             
         except Exception as e:
             logger.error(f"Memory update failed: {str(e)}")
+            import traceback
+            logger.error(f"Memory update traceback: {traceback.format_exc()}")
             return []
     
     def _create_full_trace(
