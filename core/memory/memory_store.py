@@ -42,16 +42,10 @@ class MemoryStore:
             # 1. embedding 相似度召回
             embedding_results = await self._embedding_retrieval(query, user_id)
             
-            # 2. tag-based routing
-            tag_results = await self._tag_based_routing(query, user_id)
+            # 2. chunk scoring（评分模型选择关键记忆）
+            scored_chunks = await self._chunk_scoring(query, embedding_results)
             
-            # 3. 合并结果并去重
-            all_candidates = self._merge_candidates(embedding_results, tag_results)
-            
-            # 4. chunk scoring（评分模型选择关键记忆）
-            scored_chunks = await self._chunk_scoring(query, all_candidates)
-            
-            # 5. 选择 top-k 结果
+            # 3. 选择 top-k 结果
             context_chunks = scored_chunks[:max_chunks]
             
             logger.info(f"Retrieved {len(context_chunks)} memory chunks for query: {query}")
@@ -79,25 +73,6 @@ class MemoryStore:
             
         except Exception as e:
             logger.error(f"Embedding retrieval failed: {str(e)}")
-            return []
-    
-    async def _tag_based_routing(
-        self, 
-        query: str, 
-        user_id: str
-    ) -> List[Dict[str, Any]]:
-        """tag-based routing（按标签召回）"""
-        try:
-            # 分析查询，提取可能的标签
-            query_tags = await self._extract_query_tags(query)
-            
-            # 根据标签检索相关记忆
-            tagged_memories = await self._search_by_tags(query_tags, user_id)
-            
-            return tagged_memories
-            
-        except Exception as e:
-            logger.error(f"Tag-based routing failed: {str(e)}")
             return []
     
     async def _chunk_scoring(
@@ -140,7 +115,6 @@ class MemoryStore:
             
             用户查询：{query}
             记忆片段：{chunk.get('content', '')}
-            记忆标签：{chunk.get('tags', [])}
             
             请只返回一个 0-1 之间的数字作为相关性评分。
             """
@@ -157,54 +131,6 @@ class MemoryStore:
         except Exception as e:
             logger.error(f"Chunk scoring failed: {str(e)}")
             return 0.5
-    
-    async def _extract_query_tags(self, query: str) -> List[str]:
-        """提取查询中的标签"""
-        try:
-            prompt = f"""
-            请从以下查询中提取相关标签（最多5个）：
-            查询：{query}
-            
-            请以JSON格式返回标签列表，例如：["标签1", "标签2"]
-            """
-            
-            response = await self.llm_inference.generate_response(prompt)
-            
-            try:
-                import json
-                tags = json.loads(response)
-                return tags if isinstance(tags, list) else []
-            except:
-                return []
-                
-        except Exception as e:
-            logger.error(f"Tag extraction failed: {str(e)}")
-            return []
-    
-    def _merge_candidates(
-        self, 
-        embedding_results: List[Dict[str, Any]], 
-        tag_results: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """合并 embedding 和 tag 检索结果"""
-        merged = []
-        seen_ids = set()
-        
-        # 添加 embedding 结果
-        for result in embedding_results:
-            memory_id = result.get("id")
-            if memory_id and memory_id not in seen_ids:
-                merged.append({**result, "source": "embedding"})
-                seen_ids.add(memory_id)
-        
-        # 添加 tag 结果
-        for result in tag_results:
-            memory_id = result.get("id")
-            if memory_id and memory_id not in seen_ids:
-                merged.append({**result, "source": "tag"})
-                seen_ids.add(memory_id)
-        
-        return merged
     
     async def _search_vector_db(self, query_embedding: List[float], user_id: str) -> List[Dict[str, Any]]:
         """从向量数据库搜索（FAISS实现）"""
@@ -233,7 +159,6 @@ class MemoryStore:
                 results.append({
                     "id": result["id"],
                     "content": "从FAISS检索到的内容",  # 需要从实际存储中获取
-                    "tags": [],  # 需要从实际存储中获取
                     "embedding": query_embedding,
                     "timestamp": datetime.now().isoformat()
                 })
@@ -246,16 +171,3 @@ class MemoryStore:
             logger.error(f"FAISS vector search traceback: {traceback.format_exc()}")
             # 出错时返回空结果
             return []
-    
-    async def _search_by_tags(self, tags: List[str], user_id: str) -> List[Dict[str, Any]]:
-        """根据标签搜索记忆（模拟实现）"""
-        # 这里应该连接到实际的数据库
-        # 目前返回模拟数据
-        return [
-            {
-                "id": "mem_002", 
-                "content": "Python性能优化技巧：使用列表推导式替代循环",
-                "tags": ["python", "performance", "optimization"],
-                "timestamp": datetime.now().isoformat()
-            }
-        ]

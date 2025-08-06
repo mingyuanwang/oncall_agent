@@ -62,12 +62,9 @@ class Planner:
             memory_context = "你当前拥有如下背景知识：\n"
             for i, chunk in enumerate(context_chunks, 1):
                 content = chunk.get("content", "")
-                tags = chunk.get("tags", [])
                 score = chunk.get("relevance_score", 0.0)
                 
                 memory_context += f"{i}. {content}\n"
-                if tags:
-                    memory_context += f"   标签：{', '.join(tags)}\n"
                 memory_context += f"   相关性评分：{score:.2f}\n\n"
         
         prompt = f"""
@@ -168,12 +165,9 @@ class Planner:
             memory_context = "背景知识：\n"
             for i, chunk in enumerate(context_chunks, 1):
                 content = chunk.get("content", "")
-                tags = chunk.get("tags", [])
                 score = chunk.get("relevance_score", 0.0)
                 
                 memory_context += f"{i}. {content}\n"
-                if tags:
-                    memory_context += f"   标签：{', '.join(tags)}\n"
                 memory_context += f"   相关性：{score:.2f}\n\n"
         
         prompt = f"""
@@ -205,4 +199,4 @@ class Planner:
     "estimated_time": "预计耗时"
 }}
 """
-        return prompt 
+        return prompt

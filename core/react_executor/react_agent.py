@@ -316,10 +316,7 @@ class ReactAgent:
         context = "背景知识：\n"
         for i, chunk in enumerate(context_chunks, 1):
             content = chunk.get("content", "")
-            tags = chunk.get("tags", [])
             context += f"{i}. {content}\n"
-            if tags:
-                context += f"   标签：{', '.join(tags)}\n"
         
         return context
     
@@ -340,4 +337,4 @@ class ReactAgent:
                 process += f"详情：{result_text}\n"
             process += "\n"
         
-        return process 
+        return process

@@ -207,15 +207,12 @@ class MemoryUpdater:
             content = segment.get("content", "")
             embedding = self.embedding_model.embed_text(content)
             
-            # 提取标签
-            tags = await self._extract_tags(segment)
-            
             # 创建记忆条目
             memory_entry = {
                 "id": str(uuid.uuid4()),
                 "content": content,
                 "embedding": embedding,
-                "tags": tags,
+                "tags": [],
                 "type": segment.get("type", ""),
                 "metadata": segment.get("metadata", {}),
                 "score": segment.get("score", 0.0),
@@ -229,30 +226,6 @@ class MemoryUpdater:
         except Exception as e:
             logger.error(f"Memory entry creation failed: {str(e)}")
             return {}
-    
-    async def _extract_tags(self, segment: Dict[str, Any]) -> List[str]:
-        """提取记忆片段的标签"""
-        try:
-            prompt = f"""
-            请为以下记忆片段提取相关标签（最多5个）：
-            
-            片段类型：{segment.get('type', '')}
-            片段内容：{segment.get('content', '')}
-            
-            请以JSON格式返回标签列表，例如：["标签1", "标签2"]
-            """
-            
-            response = await self.llm_inference.generate_response(prompt)
-            
-            try:
-                tags = json.loads(response)
-                return tags if isinstance(tags, list) else []
-            except:
-                return []
-                
-        except Exception as e:
-            logger.error(f"Tag extraction failed: {str(e)}")
-            return []
     
     async def _store_memory(self, memory_entry: Dict[str, Any]):
         """存储记忆条目"""
