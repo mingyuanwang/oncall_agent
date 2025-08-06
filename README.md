@@ -60,6 +60,13 @@ pip install faiss-cpu
 # 初始化FAISS索引目录
 python scripts/init_faiss.py
 
+# 配置Bing搜索API密钥（可选）
+# 获取Bing API密钥并配置到.env文件中的BING_API_KEY变量
+
+# 启动MCP服务器（可选）
+# 如果需要使用MCP工具，可以启动MCP服务器
+# python scripts/mcp_server_example.py
+
 # 运行服务
 
 ## 普通启动

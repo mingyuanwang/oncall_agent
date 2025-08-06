@@ -5,6 +5,17 @@ import json
 import requests
 import subprocess
 import os
+from utils.logger import setup_logger
+
+# 尝试导入MCP包装器
+try:
+    from models.mcp_wrapper import MCPWrapper
+    MCP_AVAILABLE = True
+except ImportError:
+    MCP_AVAILABLE = False
+    print("MCP wrapper not available.")
+
+logger = setup_logger(__name__)
 
 class ToolWrapper:
     def __init__(self):
@@ -51,6 +62,9 @@ class ToolWrapper:
         # 搜索工具
         self.register_tool("search_tool", self._search_tool)
         
+        # Bing搜索工具
+        self.register_tool("bing_search", self._bing_search_tool)
+        
         # 计算器工具
         self.register_tool("calculator_tool", self._calculator_tool)
         
@@ -62,11 +76,70 @@ class ToolWrapper:
         
         # 系统命令工具
         self.register_tool("system_tool", self._system_tool)
+        
+        # MCP工具
+        if MCP_AVAILABLE:
+            self.mcp_wrapper = MCPWrapper()
+            # 注册MCP工具调用方法
+            self.register_tool("mcp_tool", self._mcp_tool)
+        else:
+            self.mcp_wrapper = None
     
     def _search_tool(self, query: str, **kwargs) -> str:
         """搜索工具（模拟实现）"""
         # 这里应该连接到实际的搜索 API
         return f"搜索结果：{query} 的相关信息"
+    
+    def _bing_search_tool(self, query: str, **kwargs) -> str:
+        """Bing搜索工具"""
+        try:
+            # 从环境变量获取Bing API密钥
+            api_key = os.getenv("BING_API_KEY")
+            if not api_key:
+                return "错误：未配置BING_API_KEY环境变量"
+            
+            # Bing搜索API端点
+            endpoint = "https://api.bing.microsoft.com/v7.0/search"
+            
+            # 请求参数
+            params = {
+                "q": query,
+                "count": 5,  # 返回结果数量
+                "offset": 0,
+                "mkt": "zh-CN"  # 市场代码
+            }
+            
+            # 请求头
+            headers = {
+                "Ocp-Apim-Subscription-Key": api_key
+            }
+            
+            # 发送请求
+            response = requests.get(endpoint, headers=headers, params=params, timeout=10)
+            response.raise_for_status()
+            
+            # 解析响应
+            search_results = response.json()
+            web_pages = search_results.get("webPages", {}).get("value", [])
+            
+            # 格式化结果
+            if not web_pages:
+                return f"Bing搜索结果：未找到与'{query}'相关的结果"
+            
+            result_text = f"Bing搜索结果：\n"
+            for i, page in enumerate(web_pages[:3], 1):  # 只返回前3个结果
+                result_text += f"{i}. {page.get('name', '')}\n"
+                result_text += f"   URL: {page.get('url', '')}\n"
+                result_text += f"   描述: {page.get('snippet', '')}\n\n"
+            
+            return result_text
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Bing搜索请求错误: {str(e)}")
+            return f"错误：Bing搜索请求失败 - {str(e)}"
+        except Exception as e:
+            logger.error(f"Bing搜索错误: {str(e)}")
+            return f"错误：Bing搜索失败 - {str(e)}"
     
     def _calculator_tool(self, expression: str, **kwargs) -> str:
         """计算器工具"""
@@ -148,6 +221,20 @@ class ToolWrapper:
         except Exception as e:
             return f"系统命令错误：{str(e)}"
     
+    async def _mcp_tool(self, tool_name: str, **kwargs) -> str:
+        """MCP工具调用"""
+        if not self.mcp_wrapper or not self.mcp_wrapper.is_available():
+            return "MCP工具不可用，请检查MCP SDK是否已安装"
+        
+        try:
+            result = await self.mcp_wrapper.call_mcp_tool(tool_name, kwargs)
+            if result.get("success"):
+                return result.get("result", "MCP工具调用成功但无返回结果")
+            else:
+                return f"MCP工具调用失败：{result.get('error', '未知错误')}"
+        except Exception as e:
+            return f"MCP工具调用异常：{str(e)}"
+    
     async def call_tool_async(self, tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """异步调用工具"""
         try:
@@ -183,7 +270,13 @@ class ToolWrapper:
     
     def list_available_tools(self) -> List[str]:
         """列出可用的工具"""
-        return list(self.registered_tools.keys())
+        tools = list(self.registered_tools.keys())
+        
+        # 如果MCP可用，添加MCP工具信息
+        if self.mcp_wrapper and self.mcp_wrapper.is_available():
+            tools.append("mcp_tool")
+            
+        return tools
     
     def get_tool_info(self, tool_name: str) -> Dict[str, Any]:
         """获取工具信息"""
@@ -194,5 +287,11 @@ class ToolWrapper:
                 "function": tool_func.__name__,
                 "doc": tool_func.__doc__ or "No documentation available"
             }
+        elif tool_name == "mcp_tool" and self.mcp_wrapper and self.mcp_wrapper.is_available():
+            return {
+                "name": "mcp_tool",
+                "function": "_mcp_tool",
+                "doc": "MCP工具调用，可以调用外部MCP服务器提供的工具"
+            }
         else:
-            return {"error": f"Tool '{tool_name}' not found"} 
+            return {"error": f"Tool '{tool_name}' not found"}
