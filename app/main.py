@@ -18,8 +18,13 @@ def serve_chat():
     return send_from_directory('static', 'index.html')
 
 # 注册API路由
-app.register_blueprint(query_bp, url_prefix='/api/v1')
+app.register_blueprint(query_bp)
 app.register_blueprint(train_bp, url_prefix='/api/v1')
 
 if __name__ == '__main__':
+    # 打印所有注册的路由
+    print('Registered routes:')
+    for rule in app.url_map.iter_rules():
+        print(f'  {rule.endpoint}: {rule.rule}')
+    
     app.run(host='0.0.0.0', port=8000, debug=True)

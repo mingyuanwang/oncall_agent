@@ -7,6 +7,7 @@ from core.memory.memory_store import MemoryStore
 from core.planning.planner import Planner
 from core.react_executor.react_agent import ReactAgent
 from core.memory.memory_updater import MemoryUpdater
+import logging
 
 bp = Blueprint('oncall_query_api', __name__, url_prefix='/api/v1/query')
 
@@ -16,6 +17,7 @@ def query_endpoint():
     用户查询处理主入口
     完整流程：记忆检索 -> 规划 -> 执行 -> 记忆更新
     """
+    logger = logging.getLogger(__name__)
     try:
         data = request.get_json()
         logger.info(f"Received query request: {data.get('question')}")
@@ -64,5 +66,5 @@ def query_endpoint():
         })
         
     except Exception as e:
-        logger.error(f"Query processing failed: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error processing query: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
