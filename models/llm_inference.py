@@ -114,7 +114,7 @@ class LLMInference:
             payload = {
                 "model": self.model_name,
                 "messages": messages,
-                "stream": False,
+                "stream": True,  # 启用流式响应
                 "options": {
                     "temperature": temperature,
                     "num_predict": max_tokens
@@ -128,8 +128,18 @@ class LLMInference:
                     headers={"Content-Type": "application/json"}
                 ) as response:
                     if response.status == 200:
-                        result = await response.json()
-                        return result["message"]["content"]
+                        # 处理流式响应
+                        full_response = ""
+                        async for line in response.content:
+                            if line:
+                                try:
+                                    data = json.loads(line)
+                                    if "message" in data and "content" in data["message"]:
+                                        full_response += data["message"]["content"]
+                                except json.JSONDecodeError:
+                                    # 忽略无效的JSON行
+                                    pass
+                        return full_response
                     else:
                         error = await response.text()
                         return f"Ollama请求失败: {error}"

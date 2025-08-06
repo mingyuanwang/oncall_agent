@@ -132,7 +132,13 @@
             const loadingMessageId = addLoadingMessage();
 
             try {
-                const response = await fetch('/api/v1/query/', {
+                // 创建一个用于流式显示的bot消息
+                const botMessageId = addStreamingMessage();
+                let botMessageElement = document.getElementById(botMessageId);
+                let botMessageContent = botMessageElement.querySelector('.message-content');
+                
+                // 使用fetch的streaming API
+                const response = await fetch('/api/v1/query/stream', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -140,9 +146,32 @@
                     body: JSON.stringify({ question: message })
                 });
 
-                const data = await response.json();
+                if (!response.ok || !response.body) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let accumulatedText = '';
+                
                 removeLoadingMessage(loadingMessageId);
-                addMessage(data.answer, 'bot');
+                
+                // 逐块读取流数据
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    // 解码并处理数据块
+                    const chunk = decoder.decode(value, { stream: true });
+                    accumulatedText += chunk;
+                    
+                    // 更新bot消息内容
+                    botMessageContent.textContent = accumulatedText;
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+                
+                // 关闭流
+                reader.releaseLock();
             } catch (error) {
                 removeLoadingMessage(loadingMessageId);
                 addMessage('抱歉，处理请求时出错了。', 'bot');
@@ -166,6 +195,15 @@
             chatContainer.appendChild(messageDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
             return messageDiv.id;
+        }
+
+        function addStreamingMessage() {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot-message';
+            messageDiv.innerHTML = '<div class="message-content"></div>';
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return messageDiv.id = 'msg-' + Date.now();
         }
 
         function removeLoadingMessage(id) {

@@ -1,5 +1,5 @@
 # 查询入口（用户提问）
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response, stream_with_context
 from typing import Dict, Any, List
 import asyncio
 
@@ -12,6 +12,7 @@ import logging
 bp = Blueprint('oncall_query_api', __name__, url_prefix='/api/v1/query')
 
 @bp.route("/", methods=['POST'], strict_slashes=False)
+@bp.route("/stream", methods=['POST'], strict_slashes=False)
 def query_endpoint():
     """
     用户查询处理主入口
@@ -58,12 +59,26 @@ def query_endpoint():
             user_id=data.get('user_id', 'default')
         ))
         
-        return jsonify({
-            'answer': execution_result["final_answer"],
-            'plan_steps': plan_steps,
-            'intermediate_results': execution_result["intermediate_results"],
-            'memory_traces': memory_traces
-        })
+        # 检查是否是流式请求
+        if request.path.endswith('/stream'):
+            # 流式响应
+            def generate():
+                # 模拟流式输出
+                answer = execution_result["final_answer"]
+                for i in range(0, len(answer), 10):
+                    yield answer[i:i+10]
+                    # 添加一个小延迟来模拟流式效果
+                    import time
+                    time.sleep(0.1)
+            return Response(stream_with_context(generate()), content_type='text/plain')
+        else:
+            # 标准JSON响应
+            return jsonify({
+                'answer': execution_result["final_answer"],
+                'plan_steps': plan_steps,
+                'intermediate_results': execution_result["intermediate_results"],
+                'memory_traces': memory_traces
+            })
         
     except Exception as e:
         logger.error(f"Error processing query: {str(e)}")

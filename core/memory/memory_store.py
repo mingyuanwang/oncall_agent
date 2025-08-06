@@ -207,18 +207,36 @@ class MemoryStore:
         return merged
     
     async def _search_vector_db(self, query_embedding: List[float], user_id: str) -> List[Dict[str, Any]]:
-        """从向量数据库搜索（模拟实现）"""
-        # 这里应该连接到实际的向量数据库
-        # 目前返回模拟数据
-        return [
-            {
-                "id": "mem_001",
-                "content": "如何解决Python内存泄漏问题：使用gc模块进行垃圾回收",
-                "tags": ["python", "memory", "debugging"],
-                "embedding": query_embedding,
-                "timestamp": datetime.now().isoformat()
-            }
-        ]
+        """从向量数据库搜索（FAISS实现）"""
+        try:
+            # 使用FAISS向量数据库搜索
+            from .faiss_vector_store import FAISSVectorStore
+            
+            # 初始化FAISS索引
+            faiss_store = FAISSVectorStore()
+            
+            # 执行搜索
+            from config.vector_db_config import FAISSConfig
+            search_results = faiss_store.search(query_embedding, k=FAISSConfig.SEARCH_TOP_K)
+            
+            # 这里需要根据实际存储结构返回结果
+            # 目前返回模拟数据结构
+            results = []
+            for result in search_results:
+                results.append({
+                    "id": result["id"],
+                    "content": "从FAISS检索到的内容",  # 需要从实际存储中获取
+                    "tags": [],  # 需要从实际存储中获取
+                    "embedding": query_embedding,
+                    "timestamp": datetime.now().isoformat()
+                })
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"FAISS vector search failed: {str(e)}")
+            # 出错时返回空结果
+            return []
     
     async def _search_by_tags(self, tags: List[str], user_id: str) -> List[Dict[str, Any]]:
         """根据标签搜索记忆（模拟实现）"""
@@ -231,4 +249,4 @@ class MemoryStore:
                 "tags": ["python", "performance", "optimization"],
                 "timestamp": datetime.now().isoformat()
             }
-        ] 
+        ]

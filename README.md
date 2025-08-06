@@ -33,7 +33,8 @@ memory_agent_project/
 │   │   ├── knowledge_integrator.py # 多步经验融合
 │   │   └── learner.py              # 自学习模块主逻辑
 ├── data/                           # 本地知识数据
-│   ├── memory.db                   # SQLite / FAISS / Chroma 向量库
+│   ├── memory.db                   # SQLite 数据库
+│   └── faiss_index                 # FAISS 向量索引文件
 │   └── logs/                       # 执行轨迹、反馈等日志
 ├── models/                         # 本地模型或调用 OpenAI/HuggingFace 等接口
 │   ├── embedding_model.py
@@ -53,5 +54,13 @@ Memory Agent Project 是一个智能体记忆管理、推理与规划的 Python 
 # 安装依赖
 pip install -r requirements.txt
 
+# 初始化FAISS索引目录
+python scripts/init_faiss.py
+
 # 运行服务
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+## 普通启动
+python app/main.py
+
+## Debug启动
+python app/main.py --debug

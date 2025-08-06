@@ -272,10 +272,27 @@ class MemoryUpdater:
             logger.error(f"Memory storage failed: {str(e)}")
     
     async def _store_to_vector_db(self, memory_entry: Dict[str, Any]):
-        """存储到向量数据库"""
-        # 这里应该连接到实际的向量数据库（FAISS/Chroma等）
-        # 目前是模拟实现
-        logger.info(f"Storing to vector DB: {memory_entry.get('id')}")
+        """存储到向量数据库（FAISS实现）"""
+        try:
+            # 使用FAISS向量数据库存储
+            from .faiss_vector_store import FAISSVectorStore
+            
+            # 初始化FAISS索引
+            faiss_store = FAISSVectorStore()
+            
+            # 提取需要存储的数据
+            memory_id = memory_entry.get("id")
+            embedding = memory_entry.get("embedding")
+            
+            # 添加到FAISS索引
+            if memory_id and embedding:
+                faiss_store.add_vectors([memory_id], [embedding])
+                logger.info(f"Stored to FAISS vector DB: {memory_id}")
+            else:
+                logger.warning(f"Missing id or embedding for memory entry: {memory_id}")
+                
+        except Exception as e:
+            logger.error(f"Failed to store to FAISS vector DB: {str(e)}")
     
     async def _store_to_knowledge_graph(self, memory_entry: Dict[str, Any]):
         """存储到知识图谱"""
@@ -316,4 +333,4 @@ class MemoryUpdater:
             
         except Exception as e:
             logger.error(f"Memory feedback update failed: {str(e)}")
-            return False 
+            return False
