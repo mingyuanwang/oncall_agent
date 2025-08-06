@@ -215,9 +215,16 @@ class MemoryStore:
             # 初始化FAISS索引
             faiss_store = FAISSVectorStore()
             
+            # 导入配置
+            try:
+                from config.vector_db_config import FAISSConfig
+                search_top_k = FAISSConfig.SEARCH_TOP_K
+            except ImportError:
+                # 如果配置导入失败，使用默认值
+                search_top_k = 5
+            
             # 执行搜索
-            from config.vector_db_config import FAISSConfig
-            search_results = faiss_store.search(query_embedding, k=FAISSConfig.SEARCH_TOP_K)
+            search_results = faiss_store.search(query_embedding, k=search_top_k)
             
             # 这里需要根据实际存储结构返回结果
             # 目前返回模拟数据结构
@@ -235,6 +242,8 @@ class MemoryStore:
             
         except Exception as e:
             logger.error(f"FAISS vector search failed: {str(e)}")
+            import traceback
+            logger.error(f"FAISS vector search traceback: {traceback.format_exc()}")
             # 出错时返回空结果
             return []
     

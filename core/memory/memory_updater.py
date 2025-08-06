@@ -293,6 +293,8 @@ class MemoryUpdater:
                 
         except Exception as e:
             logger.error(f"Failed to store to FAISS vector DB: {str(e)}")
+            import traceback
+            logger.error(f"FAISS vector store traceback: {traceback.format_exc()}")
     
     async def _store_to_knowledge_graph(self, memory_entry: Dict[str, Any]):
         """存储到知识图谱"""

@@ -7,7 +7,17 @@ import json
 import os
 from typing import List, Dict, Any
 import logging
-from config.vector_db_config import FAISSConfig
+
+# 延迟导入配置，避免循环导入
+try:
+    from config.vector_db_config import FAISSConfig
+except ImportError as e:
+    # 如果配置导入失败，使用默认配置
+    import os
+    class FAISSConfig:
+        INDEX_PATH = os.getenv("FAISS_INDEX_PATH", "data/faiss_index")
+        DIMENSION = int(os.getenv("EMBEDDING_DIMENSION", "768"))
+        SEARCH_TOP_K = int(os.getenv("FAISS_SEARCH_TOP_K", "5"))
 
 logger = logging.getLogger(__name__)
 

@@ -54,6 +54,9 @@ Memory Agent Project 是一个智能体记忆管理、推理与规划的 Python 
 # 安装依赖
 pip install -r requirements.txt
 
+# 如果FAISS安装失败，可以单独安装
+pip install faiss-cpu
+
 # 初始化FAISS索引目录
 python scripts/init_faiss.py
 
