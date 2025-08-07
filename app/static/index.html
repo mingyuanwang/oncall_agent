@@ -165,8 +165,21 @@
                     const chunk = decoder.decode(value, { stream: true });
                     accumulatedText += chunk;
                     
+                    // 逐词打印效果实现
+                    function typeWriter(element, text, speed = 50) {
+                        let i = element.textContent.length;
+                        // 保留现有内容，从当前长度继续打印
+                        function typing() {
+                            if (i < text.length) {
+                                element.textContent += text.charAt(i);
+                                i++;
+                                setTimeout(typing, speed);
+                            }
+                        }
+                        typing();
+                    }
                     // 更新bot消息内容
-                    botMessageContent.textContent = accumulatedText;
+                    typeWriter(botMessageContent, accumulatedText);
                     chatContainer.scrollTop = chatContainer.scrollHeight;
                 }
                 
