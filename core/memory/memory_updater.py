@@ -48,20 +48,28 @@ class MemoryUpdater:
             
             # 1. 生成完整执行轨迹
             full_trace = self._create_full_trace(query, plan_steps, execution_result)
+            logger.info(f"记忆更新步骤1/4：生成执行轨迹完成，轨迹ID: {full_trace['trace_id']}")
             
             # 2. 分段打分：评估哪些步骤值得写入长期记忆
             scored_segments = await self._score_memory_segments(full_trace)
+            logger.info(f"记忆更新步骤2/4：片段打分完成，共处理 {len(scored_segments)} 个片段")
             
             # 3. 选择高分片段进行记忆存储
             valuable_segments = [seg for seg in scored_segments if seg["score"] >= 0.7]
+            logger.info(f"记忆更新步骤3/4：筛选出 {len(valuable_segments)} 个高分片段 (评分≥0.7)")
             
             # 4. 结构化处理并存储
-            for segment in valuable_segments:
+            for i, segment in enumerate(valuable_segments):
+                logger.info(f"记忆更新步骤4/4：正在处理第 {i+1}/{len(valuable_segments)} 个片段 ({segment['type']})，评分: {segment['score']:.2f}")
                 memory_entry = await self._create_memory_entry(segment, user_id)
-                await self._store_memory(memory_entry)
-                memory_traces.append(memory_entry)
+                if memory_entry:
+                    await self._store_memory(memory_entry)
+                    memory_traces.append(memory_entry)
+                    logger.info(f"记忆更新步骤4/4：片段存储完成，ID: {memory_entry['id']}")
+                else:
+                    logger.warning(f"记忆更新步骤4/4：片段创建失败，跳过存储")
             
-            logger.info(f"Updated memory with {len(memory_traces)} valuable segments")
+            logger.info(f"记忆更新完成，共存储 {len(memory_traces)} 条记忆轨迹")
             return memory_traces
             
         except Exception as e:

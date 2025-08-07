@@ -83,11 +83,34 @@ def query_endpoint():
         else:
             logger.info("返回标准JSON响应")
             # 标准JSON响应
+            # 格式化回答为HTML
+            formatted_answer = f"<p>{execution_result['final_answer'].replace('\n', '<br>')}</p>"
+            
+            # 格式化计划步骤为有序列表
+            formatted_plan = "<ol>"
+            for step in plan_steps:
+                formatted_plan += f"<li>{step}</li>"
+            formatted_plan += "</ol>"
+            
+            # 格式化中间结果为卡片列表
+            formatted_intermediate = []
+            for i, result in enumerate(execution_result["intermediate_results"]):
+                formatted_intermediate.append({
+                    "step": i+1,
+                    "thought": result.get("thought", ""),
+                    "action": result.get("action", ""),
+                    "result": f"<div class='result-card'>{result.get('result', '').replace('\n', '<br>')}</div>"
+                })
+            
             return jsonify({
-                'answer': execution_result["final_answer"],
-                'plan_steps': plan_steps,
-                'intermediate_results': execution_result["intermediate_results"],
-                'memory_traces': memory_traces
+                'status': 'success',
+                'message': '查询处理完成',
+                'data': {
+                    'answer': formatted_answer,
+                    'plan_steps': formatted_plan,
+                    'intermediate_results': formatted_intermediate,
+                    'memory_traces': memory_traces
+                }
             })
         
     except Exception as e:
