@@ -45,6 +45,20 @@
             border-radius: 18px;
             word-wrap: break-word;
         }
+        .thinking-process {
+            color: #6c757d;
+            font-style: italic;
+            padding: 10px 20px;
+            font-size: 0.9em;
+        }
+
+        .message-meta {
+            font-size: 0.8em;
+            color: #6c757d;
+            margin-bottom: 5px;
+            padding-left: 20px;
+        }
+
         .user-message .message-content {
             background-color: #0084ff;
             color: white;
@@ -55,6 +69,9 @@
             color: #333;
             border-bottom-left-radius: 4px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-top-left-radius: 18px;
+            white-space: pre-wrap; /* 保留换行符和空格 */
+            line-height: 1.5; /* 优化行高避免拥挤 */
         }
         .input-area {
             display: flex;
@@ -106,6 +123,7 @@
 </head>
 <body>
     <div class="chat-container" id="chat-container">
+        <div class="thinking-process" id="thinkingProcess"></div>
         <div class="message bot-message">
             <div class="message-content">您好！我是智能助手，有什么可以帮助您的吗？</div>
         </div>
@@ -121,6 +139,10 @@
         const sendButton = document.getElementById('send-button');
 
         async function sendMessage() {
+            // 提前声明阶段跟踪变量以确保初始化顺序
+            let currentStage = null;
+            const processedChunks = new Set();
+            
             const message = userInput.value.trim();
             if (!message) return;
 
@@ -153,33 +175,174 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder('utf-8');
                 let accumulatedText = '';
+                let currentTextPosition = 0; // 移到循环外部以保持位置追踪
+                let jsonBuffer = ''; // 缓冲区用于累积JSON数据
                 
                 removeLoadingMessage(loadingMessageId);
+                
+                // 记录思考开始时间
+                const thinkingStartTime = Date.now();
+                // 显示思考过程
+                const thinkingProcess = document.getElementById('thinkingProcess');
+                thinkingProcess.textContent = '思考中...';
                 
                 // 逐块读取流数据
                 while (true) {
                     const { done, value } = await reader.read();
-                    if (done) break;
+                    if (done) {
+                        // 处理剩余的缓冲区数据
+                        if (jsonBuffer.trim()) {
+                            processJsonChunk(jsonBuffer);
+                        }
+                        break;
+                    }
                     
                     // 解码并处理数据块
                     const chunk = decoder.decode(value, { stream: true });
-                    accumulatedText += chunk;
+                    jsonBuffer += chunk;
+                    
+                    // 按行分割处理JSON（假设后端使用行分隔的JSON流）
+                    const lines = jsonBuffer.split('\n');
+                    // 保留最后一行（可能不完整）到缓冲区
+                    jsonBuffer = lines.pop() || '';
+                    
+                    // 处理每一行完整的JSON
+                    lines.forEach(line => {
+                        if (line.trim()) {
+                            processJsonChunk(line);
+                        }
+                    });
+                
+                // 解码HTML实体的辅助函数
+                function unescapeHtml(unsafe) {
+                    return unsafe
+                        .replace(/&amp;/g, "&")
+                        .replace(/&lt;/g, "<")
+                        .replace(/&gt;/g, ">")
+                        .replace(/&quot;/g, '"')
+                        .replace(/&#039;/g, "'");
+                }
+                
+
+                
+                // 处理新阶段
+                function handleNewStage(stage) {
+                    // 如果存在当前阶段且与新阶段不同，创建新的消息块
+                    if (currentStage && currentStage !== stage) {
+                        // 完成当前消息的打印
+                        clearTimeout(timeoutId);
+                        isTyping = false;
+                        // 创建新的消息块
+                        botMessageId = addStreamingMessage();
+                        botMessageElement = document.getElementById(botMessageId);
+                        botMessageContent = botMessageElement.querySelector('.message-content');
+                        // 重置当前文本位置和已处理块集合
+                        currentTextPosition = 0;
+                        accumulatedText = '';
+                        processedChunks.clear(); // 清除已处理块集合，允许新阶段重复内容
+                    }
+                    currentStage = stage;
+                }
+                
+                // 处理JSON块的辅助函数
+                function processJsonChunk(jsonStr) {
+                    try {
+                        const data = JSON.parse(jsonStr);
+                        let textToAdd = '';
+                        // 处理新阶段
+                        if (data.stage) {
+                            handleNewStage(data.stage);
+                        }
+                        // 根据后端实际JSON结构提取文本
+                        if (typeof data === 'object') {
+                            // 提取所有可能的文本字段
+                            const textFields = [
+                                data.message,
+                                data.details?.description,
+                                data.content,
+                                data.result,
+                                data.answer,
+                                // 添加更多可能的内容字段
+                                data.retrieval_results?.map(item => item.content).join('\n'),
+                                data.planning?.steps?.map(step => `- ${step}`).join('\n'),
+                                data.final_answer
+                            ];
+                            // 过滤空值并合并文本，使用单个换行符避免多余空白
+                            textToAdd = textFields.filter(Boolean).join('\n').replace(/\n+/g, '\n');
+                            // 添加阶段状态信息
+                            if (data.stage && data.status) textToAdd += ` [${data.stage}] ${data.status}`;
+                        } else if (typeof data === 'string') {
+                            // 处理字符串类型数据，unescape特殊字符
+                            textToAdd = unescapeHtml(data).replace(/\n+/g, '\n');
+                        }
+                        // 移除首尾空白并添加到累积文本
+                        textToAdd = textToAdd.trim();
+                        // 添加文本清洗和去重处理
+                        if (textToAdd) {
+                            // 修复重复字符问题
+                            textToAdd = textToAdd.replace(/(.)\1+/g, '$1');
+                            // 修复中英文混排空格问题
+                            textToAdd = textToAdd.replace(/([一-龥])([a-zA-Z\[\]])/g, '$1 $2')
+                                                .replace(/([a-zA-Z\[\]])([一-龥])/g, '$1 $2');
+                            // 使用哈希值作为唯一标识符检测重复
+                            // 使用阶段和文本组合作为哈希键，允许不同阶段的相同内容
+                            const chunkHash = currentStage + '|' + '|' + Date.now() + '|' + textToAdd.substring(0, 100);
+                            if (!processedChunks.has(chunkHash)) {
+                                processedChunks.add(chunkHash);
+                                // 只在需要时分段，避免多余换行
+                                // 标准化换行符，避免多余空白
+                                const normalizedText = textToAdd.replace(/\n+/g, '\n');
+                                accumulatedText += normalizedText + (data.stage ? '\n' : ' ');
+                            }
+                        }
+                    } catch (e) {
+                        console.error('解析JSON失败:', e, '原始数据:', jsonStr);
+                    }
+                }
                     
                     // 逐词打印效果实现
+                    // 解码HTML实体的辅助函数
+                    function unescapeHtml(unsafe) {
+                        return unsafe
+                            .replace(/&amp;/g, "&")
+                            .replace(/&lt;/g, "<")
+                            .replace(/&gt;/g, ">")
+                            .replace(/&quot;/g, '"')
+                            .replace(/&#039;/g, "'");
+                    }
+                    
+                    let isTyping = false;
+                    let timeoutId = null;
+                    
                     function typeWriter(element, text, speed = 50) {
-                        let i = element.textContent.length;
-                        // 保留现有内容，从当前长度继续打印
+                        // 如果正在打字，先清除现有超时
+                        if (isTyping) {
+                            clearTimeout(timeoutId);
+                            isTyping = false;
+                        }
+                        
+                        let i = currentTextPosition;
+                        // 保留现有内容，从当前位置继续打印
                         function typing() {
+                            isTyping = true;
                             if (i < text.length) {
-                                element.textContent += text.charAt(i);
+                                // 使用codePointAt处理Unicode字符
+                                const codePoint = text.codePointAt(i);
+                                element.textContent += String.fromCodePoint(codePoint);
                                 i++;
-                                setTimeout(typing, speed);
+                                currentTextPosition = i;
+                                timeoutId = setTimeout(typing, speed);
+                            } else {
+                                isTyping = false;
                             }
                         }
                         typing();
                     }
                     // 更新bot消息内容
                     typeWriter(botMessageContent, accumulatedText);
+                    // 更新思考时间
+                    const thinkingTime = Date.now() - thinkingStartTime;
+                    thinkingProcess.textContent = `思考了 ${Math.round(thinkingTime/1000)} 秒`;
                     chatContainer.scrollTop = chatContainer.scrollHeight;
                 }
                 
